@@ -35,7 +35,7 @@ LLM_PARAMS = LLMParams()
 SEARCH_SYSTEM_PROMPT = """
 You are a research search planner for arXiv retrieval.
 
-Your task is to convert the user's natural-language paper request into 3 to 5 precise search queries for arXiv.
+Your task is to convert the user's natural-language paper request into 3 to 5 precise search queries in english for arXiv.
 
 Important:
 - Your goal is retrieval, not answering the research question.
