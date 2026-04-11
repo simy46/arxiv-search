@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Flask
+from flask_cors import CORS
 
 from app.config import Config
 from app.core.logger import build_logger
@@ -30,6 +31,11 @@ class App:
 
         self.flask_app = Flask(__name__)
         self.flask_app.config["JSON_SORT_KEYS"] = False
+
+        CORS(
+            self.flask_app,
+            resources={r"/api/*": {"origins": "*"}},
+        )
 
         self.history_store = HistoryStore(
             self.config.history_file_path,
