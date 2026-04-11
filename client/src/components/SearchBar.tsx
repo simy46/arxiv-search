@@ -5,14 +5,14 @@ interface SearchBarProps {
   initialQuery?: string;
   initialDateFrom?: string;
   onSearch: (query: string, dateFrom: string) => void;
-  isSearching: boolean;
+  loading: boolean;
 }
 
 export default function SearchBar({
   initialQuery = "",
   initialDateFrom = "",
   onSearch,
-  isSearching,
+  loading,
 }: SearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
@@ -44,7 +44,7 @@ export default function SearchBar({
           disabled={!query.trim()}
           className="rounded border border-primary/30 bg-primary px-4 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          {isSearching ? "Searching…" : "Search"}
+          {loading ? "Searching…" : "Search"}
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">

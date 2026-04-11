@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import TopBar from "@/components/TopBar";
 import SearchBar from "@/components/SearchBar";
@@ -37,6 +37,7 @@ export default function Index() {
   const [restoredSearch, setRestoredSearch] = useState<{ query: string; dateFrom: string } | null>(null);
   const latestRequestIdRef = useRef(0);
   const refreshTimersRef = useRef<number[]>([]);
+  const activeHistoryIdRef = useRef("");
   const loading = activeSearchCount > 0;
 
   const showApiErrorToast = useCallback((error: unknown) => {
@@ -50,6 +51,11 @@ export default function Index() {
 
   const refreshHistory = useCallback(() => {
     setHistoryRefreshKey((key) => key + 1);
+  }, []);
+
+  const setActiveHistoryId = useCallback((nextHistoryId: string) => {
+    activeHistoryIdRef.current = nextHistoryId;
+    setHistoryId(nextHistoryId);
   }, []);
 
   const refreshHistoryAfterDelay = useCallback((delayMs: number) => {
@@ -69,6 +75,15 @@ export default function Index() {
     };
   }, []);
 
+  const activeSummarizingIds = useMemo(() => {
+    if (!historyId) return new Set<string>();
+    const prefix = `${historyId}:`;
+    const paperIds = Array.from(summarizingIds)
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length));
+    return new Set(paperIds);
+  }, [historyId, summarizingIds]);
+
   const handleSearch = useCallback(async (query: string, dateFrom: string) => {
     const requestId = latestRequestIdRef.current + 1;
     latestRequestIdRef.current = requestId;
@@ -76,7 +91,7 @@ export default function Index() {
     // Start each new search from a clean result view.
     setResults([]);
     setGeneratedQueries([]);
-    setHistoryId("");
+    setActiveHistoryId("");
     setTotalCandidates(null);
 
     setActiveSearchCount((count) => count + 1);
@@ -91,7 +106,7 @@ export default function Index() {
       if (requestId === latestRequestIdRef.current) {
         setResults(res.results);
         setGeneratedQueries(res.generated_queries);
-        setHistoryId(res.history_id);
+        setActiveHistoryId(res.history_id);
         setTotalCandidates(res.total_candidates);
         setActiveHistoryStatus("completed");
         setActiveHistoryError(null);
@@ -106,7 +121,7 @@ export default function Index() {
       setActiveSearchCount((count) => Math.max(0, count - 1));
       refreshHistory();
     }
-  }, [refreshHistory, refreshHistoryAfterDelay, showApiErrorToast]);
+  }, [refreshHistory, refreshHistoryAfterDelay, setActiveHistoryId, showApiErrorToast]);
 
   const handleDownload = useCallback(async (paperId: string) => {
     setDownloadingIds((s) => new Set(s).add(paperId));
@@ -124,24 +139,38 @@ export default function Index() {
 
   const handleSummarize = useCallback(async (paperId: string) => {
     const existingPaper = results.find((paper) => paper.paper_id === paperId);
-    if (!historyId || existingPaper?.summary) return;
+    const contextHistoryId = historyId;
+    if (!contextHistoryId || existingPaper?.summary) return;
 
-    setSummarizingIds((s) => new Set(s).add(paperId));
+    const summarizeKey = `${contextHistoryId}:${paperId}`;
+    setSummarizingIds((s) => new Set(s).add(summarizeKey));
     try {
       const response = await summarizePaper({
-        history_id: historyId,
+        history_id: contextHistoryId,
         paper_id: paperId,
         style: "brief",
       });
-      setResults((prev) => prev.map((paper) => (
-        paper.paper_id === paperId
-          ? { ...paper, summary: response.summary, highlights: response.highlights }
-          : paper
-      )));
+
+      const isActiveContext = activeHistoryIdRef.current === contextHistoryId;
+      const isMatchingResponse =
+        response.history_id === contextHistoryId &&
+        response.paper_id === paperId;
+
+      if (isActiveContext && isMatchingResponse) {
+        setResults((prev) => prev.map((paper) => (
+          paper.paper_id === paperId
+            ? { ...paper, summary: response.summary, highlights: response.highlights }
+            : paper
+        )));
+      }
     } catch (error: unknown) {
       showApiErrorToast(error);
     } finally {
-      setSummarizingIds((s) => { const n = new Set(s); n.delete(paperId); return n; });
+      setSummarizingIds((s) => {
+        const n = new Set(s);
+        n.delete(summarizeKey);
+        return n;
+      });
     }
   }, [historyId, results, showApiErrorToast]);
 
@@ -154,7 +183,7 @@ export default function Index() {
       setSearchKey((k) => k + 1);
       setResults(detail.results);
       setGeneratedQueries(detail.generated_queries);
-      setHistoryId(detail.history_id);
+      setActiveHistoryId(detail.history_id);
       setTotalCandidates(null);
       setActiveHistoryStatus(detail.status);
       setActiveHistoryError(detail.error_message);
@@ -163,7 +192,7 @@ export default function Index() {
     } finally {
       setActiveSearchCount((count) => Math.max(0, count - 1));
     }
-  }, [showApiErrorToast]);
+  }, [setActiveHistoryId, showApiErrorToast]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -173,7 +202,7 @@ export default function Index() {
         initialQuery={restoredSearch?.query}
         initialDateFrom={restoredSearch?.dateFrom}
         onSearch={handleSearch}
-        isSearching={loading}
+        loading={loading}
       />
       {loading && (
         <div className="border-b px-4 py-2 text-xs text-muted-foreground">
@@ -184,8 +213,8 @@ export default function Index() {
         </div>
       )}
       {activeHistoryStatus === "running" && (
-        <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700">
-          This search is still running. Results will appear when processing completes.
+        <div className="border-b border-sky-500/30 bg-sky-500/5 px-4 py-2 text-xs text-sky-700">
+          Results will appear when processing completes.
         </div>
       )}
       {activeHistoryStatus === "failed" && activeHistoryError && (
@@ -199,7 +228,7 @@ export default function Index() {
         totalCandidates={totalCandidates}
         onDownload={handleDownload}
         onSummarize={handleSummarize}
-        summarizingIds={summarizingIds}
+        summarizingIds={activeSummarizingIds}
         downloadingIds={downloadingIds}
       />
       {!results.length && !loading && (
