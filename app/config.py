@@ -25,4 +25,5 @@ class Config:
             debug=os.getenv("APP_DEBUG", "true").strip().lower() == "true",
             history_file_path=storage_dir / "history.json",
             max_search_results=20,
+            openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
         )
