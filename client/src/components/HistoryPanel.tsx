@@ -98,25 +98,36 @@ export default function HistoryPanel({
               onClick={() => onRestore(item.history_id)}
               className="block w-full border-b border-border/50 px-3 py-2.5 text-left transition-colors hover:bg-accent"
             >
-              <div className="flex items-center gap-2">
-                <div className="truncate text-xs text-foreground">{item.query}</div>
-                {item.status === "running" && (
-                  <Loader2
-                    size={11}
-                    className="ml-auto shrink-0 animate-spin text-amber-600"
-                    aria-label="Running"
-                  />
-                )}
-                <span
-                  className={`rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${getStatusClassName(item.status)}`}
-                >
-                  {item.status}
-                </span>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1 truncate text-xs text-foreground">
+                  {item.query}
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                  {item.status === "running" && (
+                    <Loader2
+                      size={11}
+                      className="animate-spin text-amber-600"
+                      aria-label="Running"
+                    />
+                  )}
+                  <span
+                    className={`rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${getStatusClassName(item.status)}`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+              <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                <span>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="ml-auto font-mono">n={item.result_count}</span>
+                <span>
+                  {new Date(item.created_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span className="ml-auto font-mono text-[10px]">
+                  {item.result_count} results
+                </span>
               </div>
               {item.status === "failed" && item.error_message && (
                 <div className="mt-1 truncate text-[10px] text-destructive/90">
