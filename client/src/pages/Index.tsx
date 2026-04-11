@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import TopBar from "@/components/TopBar";
 import SearchBar from "@/components/SearchBar";
 import GeneratedQueries from "@/components/GeneratedQueries";
@@ -17,12 +18,13 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 export default function Index() {
-  const [loading, setLoading] = useState(false);
+  const [activeSearchCount, setActiveSearchCount] = useState(0);
   const [results, setResults] = useState<Paper[]>([]);
   const [generatedQueries, setGeneratedQueries] = useState<GeneratedQuery[]>([]);
   const [historyId, setHistoryId] = useState("");
   const [totalCandidates, setTotalCandidates] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [activeHistoryStatus, setActiveHistoryStatus] =
     useState<HistoryItem["status"] | null>(null);
   const [activeHistoryError, setActiveHistoryError] = useState<string | null>(null);
@@ -33,6 +35,8 @@ export default function Index() {
   // key to remount SearchBar on history restore
   const [searchKey, setSearchKey] = useState(0);
   const [restoredSearch, setRestoredSearch] = useState<{ query: string; dateFrom: string } | null>(null);
+  const latestRequestIdRef = useRef(0);
+  const loading = activeSearchCount > 0;
 
   const showApiErrorToast = useCallback((error: unknown) => {
     toast({
@@ -43,27 +47,39 @@ export default function Index() {
     });
   }, []);
 
+  const refreshHistory = useCallback(() => {
+    setHistoryRefreshKey((key) => key + 1);
+  }, []);
+
   const handleSearch = useCallback(async (query: string, dateFrom: string) => {
-    setLoading(true);
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
+    setActiveSearchCount((count) => count + 1);
     setActiveHistoryStatus("running");
     setActiveHistoryError(null);
+    refreshHistory();
 
     try {
       const res = await search({ query, date_from: dateFrom || null });
-      setResults(res.results);
-      setGeneratedQueries(res.generated_queries);
-      setHistoryId(res.history_id);
-      setTotalCandidates(res.total_candidates);
-      setActiveHistoryStatus("completed");
-      setActiveHistoryError(null);
+      if (requestId === latestRequestIdRef.current) {
+        setResults(res.results);
+        setGeneratedQueries(res.generated_queries);
+        setHistoryId(res.history_id);
+        setTotalCandidates(res.total_candidates);
+        setActiveHistoryStatus("completed");
+        setActiveHistoryError(null);
+      }
     } catch (error: unknown) {
-      setActiveHistoryStatus("failed");
-      setActiveHistoryError(getApiErrorMessage(error));
+      if (requestId === latestRequestIdRef.current) {
+        setActiveHistoryStatus("failed");
+        setActiveHistoryError(getApiErrorMessage(error));
+      }
       showApiErrorToast(error);
     } finally {
-      setLoading(false);
+      setActiveSearchCount((count) => Math.max(0, count - 1));
+      refreshHistory();
     }
-  }, [showApiErrorToast]);
+  }, [refreshHistory, showApiErrorToast]);
 
   const handleDownload = useCallback(async (paperId: string) => {
     setDownloadingIds((s) => new Set(s).add(paperId));
@@ -104,7 +120,7 @@ export default function Index() {
 
   const handleRestoreHistory = useCallback(async (hId: string) => {
     setHistoryOpen(false);
-    setLoading(true);
+    setActiveSearchCount((count) => count + 1);
     try {
       const detail = await fetchHistoryDetail(hId);
       setRestoredSearch({ query: detail.query, dateFrom: detail.date_from ?? "" });
@@ -118,7 +134,7 @@ export default function Index() {
     } catch (error: unknown) {
       showApiErrorToast(error);
     } finally {
-      setLoading(false);
+      setActiveSearchCount((count) => Math.max(0, count - 1));
     }
   }, [showApiErrorToast]);
 
@@ -130,8 +146,16 @@ export default function Index() {
         initialQuery={restoredSearch?.query}
         initialDateFrom={restoredSearch?.dateFrom}
         onSearch={handleSearch}
-        loading={loading}
+        isSearching={loading}
       />
+      {loading && (
+        <div className="border-b px-4 py-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" />
+            Searching...
+          </span>
+        </div>
+      )}
       {activeHistoryStatus === "running" && (
         <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700">
           This search is still running. Results will appear when processing completes.
@@ -161,6 +185,7 @@ export default function Index() {
         onClose={() => setHistoryOpen(false)}
         onRestore={handleRestoreHistory}
         onError={showApiErrorToast}
+        refreshKey={historyRefreshKey}
       />
     </div>
   );

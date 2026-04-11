@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import {
   fetchHistory,
   type HistoryListItem,
@@ -11,9 +11,16 @@ interface Props {
   onClose: () => void;
   onRestore: (historyId: string) => void;
   onError: (error: unknown) => void;
+  refreshKey: number;
 }
 
-export default function HistoryPanel({ open, onClose, onRestore, onError }: Props) {
+export default function HistoryPanel({
+  open,
+  onClose,
+  onRestore,
+  onError,
+  refreshKey,
+}: Props) {
   const [items, setItems] = useState<HistoryListItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
@@ -57,7 +64,11 @@ export default function HistoryPanel({ open, onClose, onRestore, onError }: Prop
     return () => {
       isCurrent = false;
     };
-  }, [open, page, onError]);
+  }, [open, page, onError, refreshKey]);
+
+  useEffect(() => {
+    pageCache.current = {};
+  }, [refreshKey]);
 
   if (!open) return null;
 
@@ -86,8 +97,15 @@ export default function HistoryPanel({ open, onClose, onRestore, onError }: Prop
             >
               <div className="flex items-center gap-2">
                 <div className="truncate text-xs text-foreground">{item.query}</div>
+                {item.status === "running" && (
+                  <Loader2
+                    size={11}
+                    className="ml-auto shrink-0 animate-spin text-amber-600"
+                    aria-label="Running"
+                  />
+                )}
                 <span
-                  className={`ml-auto rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${getStatusClassName(item.status)}`}
+                  className={`rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${getStatusClassName(item.status)}`}
                 >
                   {item.status}
                 </span>
