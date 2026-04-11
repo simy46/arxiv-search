@@ -4,6 +4,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 @dataclass(slots=True)
 class Config:
@@ -12,6 +16,8 @@ class Config:
     debug: bool
     history_file_path: Path
     max_search_results: int
+    openai_api_key: str
+    openai_model: str
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -19,11 +25,16 @@ class Config:
         storage_dir = app_dir / "storage"
         storage_dir.mkdir(parents=True, exist_ok=True)
 
+        history_file_path = storage_dir / "history.json"
+        if not history_file_path.exists():
+            history_file_path.write_text("[]", encoding="utf-8")
+
         return cls(
             host=os.getenv("APP_HOST", "127.0.0.1"),
             port=int(os.getenv("APP_PORT", "5000")),
             debug=os.getenv("APP_DEBUG", "true").strip().lower() == "true",
-            history_file_path=storage_dir / "history.json",
+            history_file_path=history_file_path,
             max_search_results=20,
+            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
         )

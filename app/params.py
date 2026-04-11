@@ -5,8 +5,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class MCPParams:
-    command: str = "uvx"
-    args: tuple[str, ...] = ("arxiv-mcp-server",)
+    command: str = "uv"
+    args: tuple[str, ...] = (
+        "tool",
+        "run",
+        "--from",
+        "arxiv-mcp-server",
+        "arxiv-search",
+    )
     connect_timeout_seconds: float = 20.0
 
 
