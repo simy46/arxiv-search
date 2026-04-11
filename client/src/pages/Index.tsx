@@ -11,7 +11,6 @@ import {
   fetchHistoryDetail,
   type Paper,
   type GeneratedQuery,
-  type SearchRequest,
 } from "@/lib/api";
 
 export default function Index() {
@@ -29,13 +28,13 @@ export default function Index() {
 
   // key to remount SearchBar on history restore
   const [searchKey, setSearchKey] = useState(0);
-  const [restoredSearch, setRestoredSearch] = useState<{ query: string; pageSize: number; categories: string[]; dateFrom: string } | null>(null);
+  const [restoredSearch, setRestoredSearch] = useState<{ query: string; pageSize: number; dateFrom: string } | null>(null);
 
-  const handleSearch = useCallback(async (query: string, pageSize: number, categories: string[], dateFrom: string) => {
+  const handleSearch = useCallback(async (query: string, pageSize: number, dateFrom: string) => {
     setLoading(true);
     setSummaries({});
     try {
-      const res = await search({ query, page_size: pageSize, categories, date_from: dateFrom });
+      const res = await search({ query, page_size: pageSize, date_from: dateFrom });
       setResults(res.results);
       setGeneratedQueries(res.generated_queries);
       setHistoryId(res.history_id);
@@ -78,7 +77,7 @@ export default function Index() {
     setSummaries({});
     try {
       const detail = await fetchHistoryDetail(hId);
-      setRestoredSearch({ query: detail.query, pageSize: detail.page_size, categories: detail.categories, dateFrom: detail.date_from });
+      setRestoredSearch({ query: detail.query, pageSize: detail.page_size, dateFrom: detail.date_from });
       setSearchKey((k) => k + 1);
       setResults(detail.results);
       setGeneratedQueries(detail.generated_queries);
@@ -98,7 +97,6 @@ export default function Index() {
         key={searchKey}
         initialQuery={restoredSearch?.query}
         initialPageSize={restoredSearch?.pageSize}
-        initialCategories={restoredSearch?.categories}
         initialDateFrom={restoredSearch?.dateFrom}
         onSearch={handleSearch}
         loading={loading}
