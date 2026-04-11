@@ -13,7 +13,7 @@ class MCPParams:
 
 @dataclass(frozen=True, slots=True)
 class SearchParams:
-    max_generated_queries: int = 5
+    max_generated_queries: int = 3
     max_results_per_query: int = 20
     max_final_results: int = 20
     history_page_size_default: int = 10
@@ -35,7 +35,7 @@ LLM_PARAMS = LLMParams()
 SEARCH_SYSTEM_PROMPT = """
 You are a research search planner for arXiv retrieval.
 
-Your task is to convert the user's natural-language paper request into 3 to 5 precise search queries in english for arXiv.
+Your task is to convert the user's natural-language paper request into at most 2 precise search queries in english for arXiv.
 
 Important:
 - Your goal is retrieval, not answering the research question.
