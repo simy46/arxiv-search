@@ -9,9 +9,11 @@ import {
   downloadPaper,
   summarizePaper,
   fetchHistoryDetail,
+  getApiErrorMessage,
   type Paper,
   type GeneratedQuery,
 } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export default function Index() {
   const [loading, setLoading] = useState(false);
@@ -21,74 +23,91 @@ export default function Index() {
   const [totalCandidates, setTotalCandidates] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // summaries & downloads
-  const [summaries, setSummaries] = useState<Record<string, { summary: string; highlights: string[] }>>({});
   const [summarizingIds, setSummarizingIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
   // key to remount SearchBar on history restore
   const [searchKey, setSearchKey] = useState(0);
-  const [restoredSearch, setRestoredSearch] = useState<{ query: string; pageSize: number; dateFrom: string } | null>(null);
+  const [restoredSearch, setRestoredSearch] = useState<{ query: string; dateFrom: string } | null>(null);
 
-  const handleSearch = useCallback(async (query: string, pageSize: number, dateFrom: string) => {
+  const showApiErrorToast = useCallback((error: unknown) => {
+    toast({
+      title: "Request failed",
+      description: getApiErrorMessage(error),
+      variant: "destructive",
+      duration: 4500,
+    });
+  }, []);
+
+  const handleSearch = useCallback(async (query: string, dateFrom: string) => {
     setLoading(true);
-    setSummaries({});
     try {
-      const res = await search({ query, page_size: pageSize, date_from: dateFrom });
+      const res = await search({ query, date_from: dateFrom || null });
       setResults(res.results);
       setGeneratedQueries(res.generated_queries);
       setHistoryId(res.history_id);
       setTotalCandidates(res.total_candidates);
-    } catch (e) {
-      console.error(e);
+    } catch (error: unknown) {
+      showApiErrorToast(error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showApiErrorToast]);
 
   const handleDownload = useCallback(async (paperId: string) => {
     setDownloadingIds((s) => new Set(s).add(paperId));
     try {
-      await downloadPaper(paperId);
-      setResults((prev) => prev.map((p) => (p.paper_id === paperId ? { ...p, downloaded: true } : p)));
-    } catch (e) {
-      console.error(e);
+      const response = await downloadPaper(paperId);
+      setResults((prev) => prev.map((p) => (
+        p.paper_id === paperId ? { ...p, downloaded: response.downloaded } : p
+      )));
+    } catch (error: unknown) {
+      showApiErrorToast(error);
     } finally {
       setDownloadingIds((s) => { const n = new Set(s); n.delete(paperId); return n; });
     }
-  }, []);
+  }, [showApiErrorToast]);
 
   const handleSummarize = useCallback(async (paperId: string) => {
-    if (summaries[paperId]) return;
+    const existingPaper = results.find((paper) => paper.paper_id === paperId);
+    if (!historyId || existingPaper?.summary) return;
+
     setSummarizingIds((s) => new Set(s).add(paperId));
     try {
-      const res = await summarizePaper(historyId, paperId);
-      setSummaries((prev) => ({ ...prev, [paperId]: { summary: res.summary, highlights: res.highlights } }));
-    } catch (e) {
-      console.error(e);
+      const response = await summarizePaper({
+        history_id: historyId,
+        paper_id: paperId,
+        style: "brief",
+      });
+      setResults((prev) => prev.map((paper) => (
+        paper.paper_id === paperId
+          ? { ...paper, summary: response.summary, highlights: response.highlights }
+          : paper
+      )));
+    } catch (error: unknown) {
+      showApiErrorToast(error);
     } finally {
       setSummarizingIds((s) => { const n = new Set(s); n.delete(paperId); return n; });
     }
-  }, [historyId, summaries]);
+  }, [historyId, results, showApiErrorToast]);
 
   const handleRestoreHistory = useCallback(async (hId: string) => {
     setHistoryOpen(false);
     setLoading(true);
-    setSummaries({});
     try {
       const detail = await fetchHistoryDetail(hId);
-      setRestoredSearch({ query: detail.query, pageSize: detail.page_size, dateFrom: detail.date_from });
+      setRestoredSearch({ query: detail.query, dateFrom: detail.date_from ?? "" });
       setSearchKey((k) => k + 1);
       setResults(detail.results);
       setGeneratedQueries(detail.generated_queries);
       setHistoryId(detail.history_id);
       setTotalCandidates(null);
-    } catch (e) {
-      console.error(e);
+    } catch (error: unknown) {
+      showApiErrorToast(error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showApiErrorToast]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -96,7 +115,6 @@ export default function Index() {
       <SearchBar
         key={searchKey}
         initialQuery={restoredSearch?.query}
-        initialPageSize={restoredSearch?.pageSize}
         initialDateFrom={restoredSearch?.dateFrom}
         onSearch={handleSearch}
         loading={loading}
@@ -105,10 +123,8 @@ export default function Index() {
       <ResultsList
         results={results}
         totalCandidates={totalCandidates}
-        historyId={historyId}
         onDownload={handleDownload}
         onSummarize={handleSummarize}
-        summaries={summaries}
         summarizingIds={summarizingIds}
         downloadingIds={downloadingIds}
       />
@@ -117,7 +133,12 @@ export default function Index() {
           Enter a query to search arXiv papers.
         </div>
       )}
-      <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} onRestore={handleRestoreHistory} />
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onRestore={handleRestoreHistory}
+        onError={showApiErrorToast}
+      />
     </div>
   );
 }

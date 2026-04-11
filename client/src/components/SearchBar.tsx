@@ -3,27 +3,24 @@ import { Search } from "lucide-react";
 
 interface SearchBarProps {
   initialQuery?: string;
-  initialPageSize?: number;
   initialDateFrom?: string;
-  onSearch: (query: string, pageSize: number, dateFrom: string) => void;
+  onSearch: (query: string, dateFrom: string) => void;
   loading: boolean;
 }
 
 export default function SearchBar({
   initialQuery = "",
-  initialPageSize = 10,
   initialDateFrom = "",
   onSearch,
   loading,
 }: SearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [pageSize, setPageSize] = useState(initialPageSize);
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    onSearch(query.trim(), pageSize, dateFrom);
+    onSearch(query.trim(), dateFrom);
   };
 
   const inputClass =
@@ -38,7 +35,7 @@ export default function SearchBar({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search papers (natural language)…"
+            placeholder="Search papers (authors, keywords, or in your own words)…"
             className={`${inputClass} w-full pl-7`}
           />
         </div>
@@ -51,18 +48,6 @@ export default function SearchBar({
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
-        <label className="flex items-center gap-1.5 text-muted-foreground">
-          <span>Results</span>
-          <select
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            className={`${inputClass} w-14`}
-          >
-            {[1, 5, 10, 20].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </label>
         <label className="flex items-center gap-1.5 text-muted-foreground">
           <span>From</span>
           <input

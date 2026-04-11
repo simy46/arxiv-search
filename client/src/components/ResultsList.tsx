@@ -4,10 +4,8 @@ import PaperRow from "./PaperRow";
 interface Props {
   results: Paper[];
   totalCandidates: number | null;
-  historyId: string;
   onDownload: (paperId: string) => void;
   onSummarize: (paperId: string) => void;
-  summaries: Record<string, { summary: string; highlights: string[] }>;
   summarizingIds: Set<string>;
   downloadingIds: Set<string>;
 }
@@ -15,10 +13,8 @@ interface Props {
 export default function ResultsList({
   results,
   totalCandidates,
-  historyId,
   onDownload,
   onSummarize,
-  summaries,
   summarizingIds,
   downloadingIds,
 }: Props) {
@@ -36,7 +32,7 @@ export default function ResultsList({
           paper={paper}
           onDownload={onDownload}
           onSummarize={onSummarize}
-          summary={summaries[paper.paper_id] ?? null}
+          summary={paper.summary ? { summary: paper.summary, highlights: paper.highlights } : null}
           summarizing={summarizingIds.has(paper.paper_id)}
           downloading={downloadingIds.has(paper.paper_id)}
         />

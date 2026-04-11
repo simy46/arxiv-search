@@ -1,28 +1,45 @@
 import { useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import { fetchHistory, type HistoryItem } from "@/lib/api";
+import { fetchHistory, type HistoryListItem } from "@/lib/api";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onRestore: (historyId: string) => void;
+  onError: (error: unknown) => void;
 }
 
-export default function HistoryPanel({ open, onClose, onRestore }: Props) {
-  const [items, setItems] = useState<HistoryItem[]>([]);
+export default function HistoryPanel({ open, onClose, onRestore, onError }: Props) {
+  const [items, setItems] = useState<HistoryListItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+
+    let isCurrent = true;
     setLoading(true);
-    fetchHistory(page).then((res) => {
-      setItems(res.items);
-      setHasNext(res.has_next);
-      setLoading(false);
-    });
-  }, [open, page]);
+
+    void fetchHistory(page)
+      .then((res) => {
+        if (!isCurrent) return;
+        setItems(res.items);
+        setHasNext(res.has_next);
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return;
+        onError(error);
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [open, page, onError]);
 
   if (!open) return null;
 
@@ -53,7 +70,7 @@ export default function HistoryPanel({ open, onClose, onRestore }: Props) {
               <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <span>{new Date(item.created_at).toLocaleDateString()}</span>
                 <span>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="ml-auto font-mono">n={item.page_size}</span>
+                <span className="ml-auto font-mono">n={item.result_count}</span>
               </div>
             </button>
           ))}
