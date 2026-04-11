@@ -31,7 +31,7 @@ class Config:
             history_file_path.write_text("[]", encoding="utf-8")
 
         return cls(
-            host=os.getenv("APP_HOST", "127.0.0.1"),
+            host=os.getenv("APP_HOST", "0.0.0.0"), # "127.0.0.1" if only local, i like to use it w my phone
             port=int(os.getenv("APP_PORT", "5000")),
             debug=os.getenv("APP_DEBUG", "true").strip().lower() == "true",
             log_partial_results=(

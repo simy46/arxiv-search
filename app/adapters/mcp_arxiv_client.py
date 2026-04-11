@@ -79,6 +79,9 @@ class MCPArxivClient:
             len(papers),
         )
         return papers
+    
+    def _clean_external_content_prefix(self, text: str) -> str:
+        return re.sub(r"^\s*\[EXTERNAL CONTENT\]\s*", "", text).strip()
 
     def download_paper(self, paper_id: str) -> dict[str, Any]:
         self._logger.info("mcp_client.download_paper paper_id=%s", paper_id)
@@ -237,7 +240,9 @@ class MCPArxivClient:
             if not isinstance(authors, list):
                 authors = [str(authors)]
 
-            abstract = str(item.get("abstract") or item.get("summary") or "").strip()
+            abstract = self._clean_external_content_prefix(
+                str(item.get("abstract") or item.get("summary") or "").strip()
+            )
             published = str(item.get("published") or item.get("date") or "").strip()
 
             item_categories = item.get("categories") or []
