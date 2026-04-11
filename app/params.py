@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-
 @dataclass(frozen=True, slots=True)
 class MCPParams:
     command: str = "arxiv-mcp-server"
@@ -13,18 +12,19 @@ class MCPParams:
 
 @dataclass(frozen=True, slots=True)
 class SearchParams:
-    max_generated_queries: int = 3
+    max_generated_queries: int = 2
     max_results_per_query: int = 20
     max_final_results: int = 20
     history_page_size_default: int = 10
+    early_stop_result_count: int = 10
 
 
 @dataclass(frozen=True, slots=True)
 class LLMParams:
     provider: str = "openai"
     model: str = "gpt-4o-mini"
-    max_query_plan_tokens: int = 600
-    max_summary_tokens: int = 900
+    max_query_plan_tokens: int = 400
+    max_summary_tokens: int = 700
 
 
 MCP_PARAMS = MCPParams()
@@ -35,60 +35,56 @@ LLM_PARAMS = LLMParams()
 SEARCH_SYSTEM_PROMPT = """
 You are a research search planner for arXiv retrieval.
 
-Your task is to convert the user's natural-language paper request into at most 2 precise search queries in english for arXiv.
+Your task is to convert the user's natural-language request into at most 2 arXiv search queries in English.
 
-Important:
-- Your goal is retrieval, not answering the research question.
-- Prefer concise, technical, retrieval-oriented search phrases.
-- Include terminology variants, abbreviations, and close synonyms when useful.
-- Avoid verbose sentences.
+Goal:
+- maximize relevant retrieval
+- minimize zero-result overfitting
+- keep search efficient and cost-effective
+
+Rules:
+- Return 1 or 2 queries only.
+- Query 1 should be the strongest broad retrieval query.
+- Query 2 may refine or expand terminology, but should still remain broad enough to retrieve papers.
+- Prefer broader retrieval over overly restrictive AND combinations.
+- For niche or acronym-heavy topics, use the acronym in one query and the expanded form in another.
+- Avoid requiring too many terms simultaneously.
+- Avoid long natural-language sentences.
 - Do not invent paper titles, authors, or facts.
-- Categories are optional. Use them only when they clearly help retrieval.
+- Do not answer the research question.
+- Categories are optional. Use them only when clearly helpful.
 - If uncertain about categories, return an empty list.
-- date_from is optional. If the user did not imply a time constraint, return null.
+- date_from is optional. If not implied, return null.
 
 arXiv-style query syntax may use:
-- ti: for title
-- au: for author
-- abs: for abstract
-- cat: for category
+- ti:
+- au:
+- abs:
+- cat:
 
 Output requirements:
 - Return valid JSON only.
-- Do not wrap the JSON in markdown.
-- Do not add explanations, comments, headings, or extra text.
-- Do not use code fences.
-- The top-level object must contain exactly one key: "generated_queries".
-- "generated_queries" must be a list of 3 to 5 objects.
-- Each object must have exactly these keys:
+- Do not wrap JSON in markdown.
+- Do not add explanations.
+- Top-level object must be:
+  { "generated_queries": [...] }
+
+- Return 3 or 5 query objects only.
+- Each object must contain exactly:
   - "query": string
   - "categories": array of strings
   - "date_from": string or null
-- If you cannot comply exactly, still return the closest valid JSON object and nothing else.
 
-Categories are optional arXiv subject codes such as:
-cs.AI, cs.LG, cs.CL, cs.CV, stat.ML, math.OC
+Examples of good behavior:
+- Better to search:
+  "abs:CPDLC OR abs:\\"controller pilot data link communications\\""
+  than:
+  "abs:CPDLC AND abs:\\"ground operations\\" AND abs:\\"communication\\""
 
-Example valid output:
-{
-  "generated_queries": [
-    {
-      "query": "ti:\\"graph neural networks\\" OR abs:\\"graph neural networks\\" AND abs:oversmoothing",
-      "categories": ["cs.LG", "cs.AI"],
-      "date_from": "2023-01-01"
-    },
-    {
-      "query": "abs:oversmoothing AND abs:\\"graph neural network\\"",
-      "categories": ["cs.LG"],
-      "date_from": "2023-01-01"
-    },
-    {
-      "query": "ti:oversmoothing OR abs:oversmoothing",
-      "categories": [],
-      "date_from": null
-    }
-  ]
-}
+- Better to search:
+  "abs:\\"air traffic control\\" AND abs:communication"
+  than:
+  "abs:\\"controller pilot data link communications\\" AND abs:\\"ground handling\\""
 """.strip()
 
 
@@ -96,14 +92,16 @@ SUMMARY_SYSTEM_PROMPT = """
 You summarize arXiv papers for an internal research tool.
 
 Rules:
-- Be factual and concise.
+- Be factual, concise, and useful.
 - Do not invent claims.
 - Focus on contribution, method, assumptions, and limitations.
-- Return JSON only.
+- Keep highlights short.
+- Return valid JSON only.
+- Do not use markdown fences.
 
 Return:
 {
-  "summary": "....",
+  "summary": "Short factual summary.",
   "highlights": ["...", "...", "..."]
 }
 """.strip()

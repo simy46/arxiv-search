@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from app.core.logger import log_partial_result
 from app.core.types import GeneratedQuery, HistoryItem, Paper
@@ -249,7 +250,8 @@ class HistoryManager:
         return updated if updated is not None else pending
 
     def _build_history_id(self) -> str:
-        return f"hist_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+        timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        return f"hist_{timestamp_ms}_{uuid4().hex[:8]}"
 
     @staticmethod
     def _normalize_search_key(
