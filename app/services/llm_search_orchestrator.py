@@ -134,7 +134,7 @@ class LLMSearchOrchestrator:
 
             intersection = len(candidate_tokens.intersection(existing_tokens))
             union = len(candidate_tokens.union(existing_tokens))
-            if union > 0 and (intersection / union) >= 0.85:
+            if union > 0 and (intersection / union) >= 0.92:
                 return True
 
         return False
