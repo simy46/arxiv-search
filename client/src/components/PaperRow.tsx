@@ -1,6 +1,20 @@
 import { Download, FileText, Check } from "lucide-react";
 import type { Paper } from "@/lib/api";
 
+const formatPublishedDate = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    timeZone: "UTC",
+  }).format(parsed);
+};
+
 interface Props {
   paper: Paper;
   onDownload: (paperId: string) => void;
@@ -12,6 +26,7 @@ interface Props {
 
 export default function PaperRow({ paper, onDownload, onSummarize, summary, summarizing, downloading }: Props) {
   const hasSummary = !!summary;
+  const publishedDate = formatPublishedDate(paper.published);
 
   return (
     <div className="border-b border-border/60 px-4 py-3 transition-colors hover:bg-surface-raised/50">
@@ -28,7 +43,7 @@ export default function PaperRow({ paper, onDownload, onSummarize, summary, summ
           <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>{paper.authors.join(", ")}</span>
             <span className="text-border">·</span>
-            <span>{paper.published}</span>
+            <span>{publishedDate}</span>
             {paper.score != null && (
               <>
                 <span className="text-border">·</span>
