@@ -14,6 +14,7 @@ class Config:
     host: str
     port: int
     debug: bool
+    log_partial_results: bool
     history_file_path: Path
     max_search_results: int
     openai_api_key: str
@@ -33,6 +34,9 @@ class Config:
             host=os.getenv("APP_HOST", "127.0.0.1"),
             port=int(os.getenv("APP_PORT", "5000")),
             debug=os.getenv("APP_DEBUG", "true").strip().lower() == "true",
+            log_partial_results=(
+                os.getenv("APP_LOG_PARTIAL_RESULTS", "false").strip().lower() == "true"
+            ),
             history_file_path=history_file_path,
             max_search_results=20,
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
