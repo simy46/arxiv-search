@@ -72,6 +72,13 @@ export default function Index() {
   const handleSearch = useCallback(async (query: string, dateFrom: string) => {
     const requestId = latestRequestIdRef.current + 1;
     latestRequestIdRef.current = requestId;
+
+    // Start each new search from a clean result view.
+    setResults([]);
+    setGeneratedQueries([]);
+    setHistoryId("");
+    setTotalCandidates(null);
+
     setActiveSearchCount((count) => count + 1);
     setActiveHistoryStatus("running");
     setActiveHistoryError(null);
