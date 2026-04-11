@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import TopBar from "@/components/TopBar";
 import SearchBar from "@/components/SearchBar";
@@ -36,6 +36,7 @@ export default function Index() {
   const [searchKey, setSearchKey] = useState(0);
   const [restoredSearch, setRestoredSearch] = useState<{ query: string; dateFrom: string } | null>(null);
   const latestRequestIdRef = useRef(0);
+  const refreshTimersRef = useRef<number[]>([]);
   const loading = activeSearchCount > 0;
 
   const showApiErrorToast = useCallback((error: unknown) => {
@@ -51,6 +52,23 @@ export default function Index() {
     setHistoryRefreshKey((key) => key + 1);
   }, []);
 
+  const refreshHistoryAfterDelay = useCallback((delayMs: number) => {
+    const timerId = window.setTimeout(() => {
+      refreshHistory();
+      refreshTimersRef.current = refreshTimersRef.current.filter((id) => id !== timerId);
+    }, delayMs);
+    refreshTimersRef.current.push(timerId);
+  }, [refreshHistory]);
+
+  useEffect(() => {
+    return () => {
+      for (const timerId of refreshTimersRef.current) {
+        window.clearTimeout(timerId);
+      }
+      refreshTimersRef.current = [];
+    };
+  }, []);
+
   const handleSearch = useCallback(async (query: string, dateFrom: string) => {
     const requestId = latestRequestIdRef.current + 1;
     latestRequestIdRef.current = requestId;
@@ -58,6 +76,8 @@ export default function Index() {
     setActiveHistoryStatus("running");
     setActiveHistoryError(null);
     refreshHistory();
+    refreshHistoryAfterDelay(350);
+    refreshHistoryAfterDelay(1200);
 
     try {
       const res = await search({ query, date_from: dateFrom || null });
@@ -79,7 +99,7 @@ export default function Index() {
       setActiveSearchCount((count) => Math.max(0, count - 1));
       refreshHistory();
     }
-  }, [refreshHistory, showApiErrorToast]);
+  }, [refreshHistory, refreshHistoryAfterDelay, showApiErrorToast]);
 
   const handleDownload = useCallback(async (paperId: string) => {
     setDownloadingIds((s) => new Set(s).add(paperId));

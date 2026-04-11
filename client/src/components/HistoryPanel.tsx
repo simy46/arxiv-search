@@ -26,6 +26,7 @@ export default function HistoryPanel({
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(false);
   const pageCache = useRef<Record<number, HistoryListResponse>>({});
+  const lastRefreshKey = useRef(refreshKey);
 
   const getStatusClassName = (status: HistoryListItem["status"]): string => {
     if (status === "failed") return "border-destructive/30 text-destructive";
@@ -34,10 +35,16 @@ export default function HistoryPanel({
   };
 
   useEffect(() => {
+    const hasRefreshSignal = refreshKey !== lastRefreshKey.current;
+    if (hasRefreshSignal) {
+      pageCache.current = {};
+      lastRefreshKey.current = refreshKey;
+    }
+
     if (!open) return;
 
     let isCurrent = true;
-    const cachedPage = pageCache.current[page];
+    const cachedPage = hasRefreshSignal ? undefined : pageCache.current[page];
     if (cachedPage) {
       setItems(cachedPage.items);
       setHasNext(cachedPage.has_next);
@@ -65,10 +72,6 @@ export default function HistoryPanel({
       isCurrent = false;
     };
   }, [open, page, onError, refreshKey]);
-
-  useEffect(() => {
-    pageCache.current = {};
-  }, [refreshKey]);
 
   if (!open) return null;
 
