@@ -30,7 +30,7 @@ export default function HistoryPanel({
 
   const getStatusClassName = (status: HistoryListItem["status"]): string => {
     if (status === "failed") return "border-destructive/30 text-destructive";
-    if (status === "running") return "border-amber-500/30 text-amber-600";
+    if (status === "running") return "border-sky-500/30 text-sky-700";
     return "border-emerald-500/30 text-emerald-700";
   };
 
@@ -106,7 +106,7 @@ export default function HistoryPanel({
                   {item.status === "running" && (
                     <Loader2
                       size={11}
-                      className="animate-spin text-amber-600"
+                      className="animate-spin text-sky-700"
                       aria-label="Running"
                     />
                   )}

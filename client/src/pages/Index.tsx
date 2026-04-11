@@ -204,17 +204,12 @@ export default function Index() {
         onSearch={handleSearch}
         loading={loading}
       />
-      {loading && (
-        <div className="border-b px-4 py-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Loader2 size={12} className="animate-spin" />
-            Searching...
-          </span>
-        </div>
-      )}
       {activeHistoryStatus === "running" && (
         <div className="border-b border-sky-500/30 bg-sky-500/5 px-4 py-2 text-xs text-sky-700">
-          Results will appear when processing completes.
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" />
+            Results will appear when processing completes.
+          </span>
         </div>
       )}
       {activeHistoryStatus === "failed" && activeHistoryError && (
