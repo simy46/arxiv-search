@@ -3,16 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+
 @dataclass(frozen=True, slots=True)
 class MCPParams:
-    command: str = "uv"
-    args: tuple[str, ...] = (
-        "tool",
-        "run",
-        "--from",
-        "arxiv-mcp-server",
-        "arxiv-search",
-    )
+    command: str = "arxiv-mcp-server"
+    args: tuple[str, ...] = ()
     connect_timeout_seconds: float = 20.0
 
 
