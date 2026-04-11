@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 
 from app.core.logger import log_partial_result
@@ -18,30 +19,33 @@ class HistoryStore:
         self._file_path = file_path
         self._logger = logger
         self._log_partial_results = log_partial_results
+        self._io_lock = threading.RLock()
         self._ensure_file()
 
     def load_all(self) -> list[HistoryItem]:
-        self._logger.info("history_store.load_all")
-        raw_items = self._read_json()
-        items = [HistoryItem.from_dict(item) for item in raw_items]
-        log_partial_result(
-            self._logger,
-            self._log_partial_results,
-            "history_store.load_all loaded_count=%s",
-            len(items),
-        )
-        return items
+        with self._io_lock:
+            self._logger.info("history_store.load_all")
+            raw_items = self._read_json()
+            items = [HistoryItem.from_dict(item) for item in raw_items]
+            log_partial_result(
+                self._logger,
+                self._log_partial_results,
+                "history_store.load_all loaded_count=%s",
+                len(items),
+            )
+            return items
 
     def save_all(self, items: list[HistoryItem]) -> None:
-        self._logger.info("history_store.save_all item_count=%s", len(items))
-        payload = [item.to_dict() for item in items]
-        log_partial_result(
-            self._logger,
-            self._log_partial_results,
-            "history_store.save_all first_ids=%s",
-            [item["history_id"] for item in payload[:3]],
-        )
-        self._write_json(payload)
+        with self._io_lock:
+            self._logger.info("history_store.save_all item_count=%s", len(items))
+            payload = [item.to_dict() for item in items]
+            log_partial_result(
+                self._logger,
+                self._log_partial_results,
+                "history_store.save_all first_ids=%s",
+                [item["history_id"] for item in payload[:3]],
+            )
+            self._write_json(payload)
 
     def _ensure_file(self) -> None:
         if not self._file_path.exists():

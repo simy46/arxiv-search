@@ -122,4 +122,5 @@ class App:
             host=self.config.host,
             port=self.config.port,
             debug=self.config.debug,
+            threaded=True,
         )

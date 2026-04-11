@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from typing import Literal
 from typing import Any
 
 
@@ -81,6 +82,8 @@ class HistoryItem:
     generated_queries: list[GeneratedQuery]
     results: list[Paper]
     created_at: str
+    status: Literal["running", "completed", "failed"] = "completed"
+    error_message: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -91,10 +94,19 @@ class HistoryItem:
             "generated_queries": [item.to_dict() for item in self.generated_queries],
             "results": [paper.to_dict() for paper in self.results],
             "created_at": self.created_at,
+            "status": self.status,
+            "error_message": self.error_message,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "HistoryItem":
+        raw_status = str(data.get("status", "completed"))
+        status: Literal["running", "completed", "failed"]
+        if raw_status in {"running", "completed", "failed"}:
+            status = raw_status
+        else:
+            status = "completed"
+
         return cls(
             history_id=str(data["history_id"]),
             query=str(data["query"]),
@@ -106,6 +118,12 @@ class HistoryItem:
             ],
             results=[Paper.from_dict(item) for item in data.get("results", [])],
             created_at=str(data["created_at"]),
+            status=status,
+            error_message=(
+                str(data["error_message"])
+                if data.get("error_message") is not None
+                else None
+            ),
         )
 
 
