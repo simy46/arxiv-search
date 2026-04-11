@@ -10,6 +10,7 @@ import {
   summarizePaper,
   fetchHistoryDetail,
   getApiErrorMessage,
+  type HistoryItem,
   type Paper,
   type GeneratedQuery,
 } from "@/lib/api";
@@ -22,6 +23,9 @@ export default function Index() {
   const [historyId, setHistoryId] = useState("");
   const [totalCandidates, setTotalCandidates] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeHistoryStatus, setActiveHistoryStatus] =
+    useState<HistoryItem["status"] | null>(null);
+  const [activeHistoryError, setActiveHistoryError] = useState<string | null>(null);
 
   const [summarizingIds, setSummarizingIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
@@ -41,13 +45,20 @@ export default function Index() {
 
   const handleSearch = useCallback(async (query: string, dateFrom: string) => {
     setLoading(true);
+    setActiveHistoryStatus("running");
+    setActiveHistoryError(null);
+
     try {
       const res = await search({ query, date_from: dateFrom || null });
       setResults(res.results);
       setGeneratedQueries(res.generated_queries);
       setHistoryId(res.history_id);
       setTotalCandidates(res.total_candidates);
+      setActiveHistoryStatus("completed");
+      setActiveHistoryError(null);
     } catch (error: unknown) {
+      setActiveHistoryStatus("failed");
+      setActiveHistoryError(getApiErrorMessage(error));
       showApiErrorToast(error);
     } finally {
       setLoading(false);
@@ -102,6 +113,8 @@ export default function Index() {
       setGeneratedQueries(detail.generated_queries);
       setHistoryId(detail.history_id);
       setTotalCandidates(null);
+      setActiveHistoryStatus(detail.status);
+      setActiveHistoryError(detail.error_message);
     } catch (error: unknown) {
       showApiErrorToast(error);
     } finally {
@@ -119,6 +132,16 @@ export default function Index() {
         onSearch={handleSearch}
         loading={loading}
       />
+      {activeHistoryStatus === "running" && (
+        <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700">
+          This search is still running. Results will appear when processing completes.
+        </div>
+      )}
+      {activeHistoryStatus === "failed" && activeHistoryError && (
+        <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
+          {activeHistoryError}
+        </div>
+      )}
       <GeneratedQueries queries={generatedQueries} />
       <ResultsList
         results={results}

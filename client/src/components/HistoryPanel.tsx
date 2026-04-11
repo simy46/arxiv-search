@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import { fetchHistory, type HistoryListItem } from "@/lib/api";
+import {
+  fetchHistory,
+  type HistoryListItem,
+  type HistoryListResponse,
+} from "@/lib/api";
 
 interface Props {
   open: boolean;
@@ -14,16 +18,30 @@ export default function HistoryPanel({ open, onClose, onRestore, onError }: Prop
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(false);
+  const pageCache = useRef<Record<number, HistoryListResponse>>({});
+
+  const getStatusClassName = (status: HistoryListItem["status"]): string => {
+    if (status === "failed") return "border-destructive/30 text-destructive";
+    if (status === "running") return "border-amber-500/30 text-amber-600";
+    return "border-emerald-500/30 text-emerald-700";
+  };
 
   useEffect(() => {
     if (!open) return;
 
     let isCurrent = true;
-    setLoading(true);
+    const cachedPage = pageCache.current[page];
+    if (cachedPage) {
+      setItems(cachedPage.items);
+      setHasNext(cachedPage.has_next);
+      return;
+    }
 
+    setLoading(true);
     void fetchHistory(page)
       .then((res) => {
         if (!isCurrent) return;
+        pageCache.current[page] = res;
         setItems(res.items);
         setHasNext(res.has_next);
       })
@@ -66,12 +84,24 @@ export default function HistoryPanel({ open, onClose, onRestore, onError }: Prop
               onClick={() => onRestore(item.history_id)}
               className="block w-full border-b border-border/50 px-3 py-2.5 text-left transition-colors hover:bg-accent"
             >
-              <div className="truncate text-xs text-foreground">{item.query}</div>
+              <div className="flex items-center gap-2">
+                <div className="truncate text-xs text-foreground">{item.query}</div>
+                <span
+                  className={`ml-auto rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${getStatusClassName(item.status)}`}
+                >
+                  {item.status}
+                </span>
+              </div>
               <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
                 <span>{new Date(item.created_at).toLocaleDateString()}</span>
                 <span>{new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="ml-auto font-mono">n={item.result_count}</span>
               </div>
+              {item.status === "failed" && item.error_message && (
+                <div className="mt-1 truncate text-[10px] text-destructive/90">
+                  {item.error_message}
+                </div>
+              )}
             </button>
           ))}
           {!loading && items.length === 0 && (
