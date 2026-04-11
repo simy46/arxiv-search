@@ -22,24 +22,52 @@ class App:
     def __init__(self) -> None:
         self.config = Config.from_env()
         self.logger = build_logger("arxiv-search", self.config.debug)
+        self.logger.info(
+            "app.init debug=%s log_partial_results=%s",
+            self.config.debug,
+            self.config.log_partial_results,
+        )
 
         self.flask_app = Flask(__name__)
         self.flask_app.config["JSON_SORT_KEYS"] = False
 
-        self.history_store = HistoryStore(self.config.history_file_path)
-        self.history_manager = HistoryManager(self.history_store)
+        self.history_store = HistoryStore(
+            self.config.history_file_path,
+            logger=self.logger.getChild("history_store"),
+            log_partial_results=self.config.log_partial_results,
+        )
+        self.history_manager = HistoryManager(
+            self.history_store,
+            logger=self.logger.getChild("history_manager"),
+            log_partial_results=self.config.log_partial_results,
+        )
 
-        self.llm_client = LLMClient()
-        self.mcp_arxiv_client = MCPArxivClient()
+        self.llm_client = LLMClient(
+            logger=self.logger.getChild("llm_client"),
+            log_partial_results=self.config.log_partial_results,
+        )
+        self.mcp_arxiv_client = MCPArxivClient(
+            logger=self.logger.getChild("mcp_client"),
+            log_partial_results=self.config.log_partial_results,
+        )
 
-        self.llm_search_orchestrator = LLMSearchOrchestrator(self.llm_client)
-        self.reranker = Reranker()
+        self.llm_search_orchestrator = LLMSearchOrchestrator(
+            self.llm_client,
+            logger=self.logger.getChild("orchestrator"),
+            log_partial_results=self.config.log_partial_results,
+        )
+        self.reranker = Reranker(
+            logger=self.logger.getChild("reranker"),
+            log_partial_results=self.config.log_partial_results,
+        )
 
         self.arxiv_search_manager = ArxivSearchManager(
             history_manager=self.history_manager,
             llm_search_orchestrator=self.llm_search_orchestrator,
             reranker=self.reranker,
             mcp_arxiv_client=self.mcp_arxiv_client,
+            logger=self.logger.getChild("search_manager"),
+            log_partial_results=self.config.log_partial_results,
             max_results=self.config.max_search_results,
         )
 
@@ -47,15 +75,36 @@ class App:
             history_manager=self.history_manager,
             llm_client=self.llm_client,
             mcp_arxiv_client=self.mcp_arxiv_client,
+            logger=self.logger.getChild("paper_manager"),
+            log_partial_results=self.config.log_partial_results,
         )
 
         self._register_blueprints()
 
     def _register_blueprints(self) -> None:
-        self.flask_app.register_blueprint(create_health_blueprint())
-        self.flask_app.register_blueprint(create_search_blueprint(self.arxiv_search_manager))
-        self.flask_app.register_blueprint(create_paper_blueprint(self.paper_manager))
-        self.flask_app.register_blueprint(create_history_blueprint(self.history_manager))
+        self.flask_app.register_blueprint(
+            create_health_blueprint(self.logger.getChild("route.health"))
+        )
+        self.flask_app.register_blueprint(
+            create_search_blueprint(
+                self.arxiv_search_manager,
+                logger=self.logger.getChild("route.search"),
+                log_partial_results=self.config.log_partial_results,
+            )
+        )
+        self.flask_app.register_blueprint(
+            create_paper_blueprint(
+                self.paper_manager,
+                logger=self.logger.getChild("route.paper"),
+                log_partial_results=self.config.log_partial_results,
+            )
+        )
+        self.flask_app.register_blueprint(
+            create_history_blueprint(
+                self.history_manager,
+                logger=self.logger.getChild("route.history"),
+            )
+        )
 
     def run(self) -> None:
         self.logger.info(

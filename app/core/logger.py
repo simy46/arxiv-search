@@ -39,5 +39,7 @@ def log_partial_result(
     message: str,
     *args: object,
 ) -> None:
-    if should_log_partial_results(logger, force_enabled):
+    if force_enabled and not logger.isEnabledFor(logging.DEBUG):
+        logger.info("[partial] " + message, *args)
+    elif should_log_partial_results(logger, force_enabled):
         logger.debug("[partial] " + message, *args)
