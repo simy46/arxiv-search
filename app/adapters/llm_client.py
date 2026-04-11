@@ -20,6 +20,7 @@ class LLMClient:
     ) -> None:
         self._logger = logger
         self._log_partial_results = log_partial_results
+
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             self._logger.error("llm_client.init missing OPENAI_API_KEY")
@@ -35,6 +36,7 @@ class LLMClient:
         date_from: str | None,
     ) -> dict[str, Any]:
         self._logger.info("llm_client.generate_query_plan query=%r", user_query)
+
         user_payload = {
             "user_query": user_query,
             "categories": categories,
@@ -43,11 +45,11 @@ class LLMClient:
 
         response = self._client.responses.create(
             model=LLM_PARAMS.model,
-            max_output_tokens=LLM_PARAMS.max_query_plan_tokens,
             input=[
                 {"role": "developer", "content": SEARCH_SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
+            max_output_tokens=LLM_PARAMS.max_query_plan_tokens,
         )
 
         text = (response.output_text or "").strip()
@@ -58,17 +60,48 @@ class LLMClient:
             text[:600],
         )
 
-        try:
-            parsed = self._parse_json_response(text)
-            self._logger.info("llm_client.generate_query_plan parsed_success")
-            return parsed
-        except Exception:
-            self._logger.exception("llm_client.generate_query_plan parse_failed using_fallback")
-            return self._fallback_query_plan(
-                user_query=user_query,
-                categories=categories,
-                date_from=date_from,
+        parsed = self._parse_json_response(text)
+
+        if "generated_queries" not in parsed:
+            raise RuntimeError("LLM query plan missing 'generated_queries'")
+
+        generated_queries = parsed["generated_queries"]
+        if not isinstance(generated_queries, list) or len(generated_queries) == 0:
+            raise RuntimeError("LLM query plan returned no generated queries")
+
+        normalized_queries: list[dict[str, Any]] = []
+        for item in generated_queries:
+            if not isinstance(item, dict):
+                raise RuntimeError("LLM query plan contains a non-object entry")
+
+            query = str(item.get("query", "")).strip()
+            if not query:
+                continue
+
+            item_categories = item.get("categories", [])
+            if not isinstance(item_categories, list):
+                item_categories = []
+
+            item_date_from = item.get("date_from")
+            if item_date_from is not None:
+                item_date_from = str(item_date_from).strip() or None
+
+            normalized_queries.append(
+                {
+                    "query": query,
+                    "categories": [str(category) for category in item_categories],
+                    "date_from": item_date_from,
+                }
             )
+
+        if len(normalized_queries) == 0:
+            raise RuntimeError("LLM query plan produced no valid queries")
+
+        self._logger.info(
+            "llm_client.generate_query_plan parsed_success count=%s",
+            len(normalized_queries),
+        )
+        return {"generated_queries": normalized_queries}
 
     def summarize_markdown(
         self,
@@ -76,6 +109,7 @@ class LLMClient:
         style: str = "brief",
     ) -> dict[str, Any]:
         self._logger.info("llm_client.summarize_markdown style=%s", style)
+
         user_payload = {
             "style": style,
             "paper_markdown": markdown_text[:120000],
@@ -83,11 +117,11 @@ class LLMClient:
 
         response = self._client.responses.create(
             model=LLM_PARAMS.model,
-            max_output_tokens=LLM_PARAMS.max_summary_tokens,
             input=[
                 {"role": "developer", "content": SUMMARY_SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
+            max_output_tokens=LLM_PARAMS.max_summary_tokens,
         )
 
         text = (response.output_text or "").strip()
@@ -98,95 +132,46 @@ class LLMClient:
             text[:600],
         )
 
-        try:
-            parsed = self._parse_json_response(text)
-            self._logger.info("llm_client.summarize_markdown parsed_success")
-            return parsed
-        except Exception:
-            self._logger.exception("llm_client.summarize_markdown parse_failed using_fallback")
-            preview = " ".join(markdown_text.split())[:400]
-            return {
-                "summary": preview + "..." if preview else "No content available.",
-                "highlights": [
-                    "Automatic summary fallback",
-                    "Model did not return valid JSON",
-                    "Review paper manually if needed",
-                ],
-            }
+        parsed = self._parse_json_response(text)
+
+        summary = str(parsed.get("summary", "")).strip()
+        highlights = parsed.get("highlights", [])
+
+        if not summary:
+            raise RuntimeError("LLM summary response missing 'summary'")
+
+        if not isinstance(highlights, list):
+            highlights = []
+
+        return {
+            "summary": summary,
+            "highlights": [str(item) for item in highlights],
+        }
 
     def _parse_json_response(self, text: str) -> dict[str, Any]:
         if not text:
-            raise ValueError("Model returned empty output")
+            raise RuntimeError("Model returned empty output")
 
-        # remove fenced code blocks if present
-        text = text.strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
+        candidate = text.strip()
 
-        # direct parse first
+        if candidate.startswith("```"):
+            candidate = re.sub(r"^```(?:json)?\s*", "", candidate)
+            candidate = re.sub(r"\s*```$", "", candidate)
+
         try:
-            parsed = json.loads(text)
+            parsed = json.loads(candidate)
             if not isinstance(parsed, dict):
-                raise ValueError("Parsed JSON is not an object")
+                raise RuntimeError("Parsed JSON is not an object")
             return parsed
         except json.JSONDecodeError:
             pass
 
-        # extract first JSON object from mixed text
-        match = re.search(r"\{.*\}", text, re.DOTALL)
+        match = re.search(r"\{.*\}", candidate, re.DOTALL)
         if not match:
-            raise ValueError(f"Could not find JSON object in model output: {text[:300]!r}")
+            raise RuntimeError(f"Could not find JSON object in model output: {candidate[:300]!r}")
 
         parsed = json.loads(match.group(0))
         if not isinstance(parsed, dict):
-            raise ValueError("Parsed JSON is not an object")
+            raise RuntimeError("Parsed JSON is not an object")
 
         return parsed
-
-    def _fallback_query_plan(
-        self,
-        user_query: str,
-        categories: list[str],
-        date_from: str | None,
-    ) -> dict[str, Any]:
-        self._logger.info("llm_client.fallback_query_plan query=%r", user_query)
-        normalized = " ".join(user_query.split()).strip()
-
-        variants = [
-            normalized,
-            f"\"{normalized}\"",
-        ]
-
-        lower = normalized.lower()
-        if "cpdlc" in lower:
-            variants.append("CPDLC human factors workload")
-        if "pilot" in lower:
-            variants.append("pilot workload aviation human factors")
-        if "air traffic" in lower or "atc" in lower:
-            variants.append("air traffic control human factors communication")
-
-        seen: set[str] = set()
-        generated_queries: list[dict[str, Any]] = []
-
-        for query in variants:
-            q = " ".join(query.split()).strip()
-            if not q or q in seen:
-                continue
-            seen.add(q)
-            generated_queries.append(
-                {
-                    "query": q,
-                    "categories": categories,
-                    "date_from": date_from,
-                }
-            )
-
-        fallback = {"generated_queries": generated_queries[:5]}
-        log_partial_result(
-            self._logger,
-            self._log_partial_results,
-            "llm_client.fallback_query_plan generated=%s",
-            fallback,
-        )
-        return fallback

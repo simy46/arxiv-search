@@ -22,7 +22,7 @@ class SearchParams:
 @dataclass(frozen=True, slots=True)
 class LLMParams:
     provider: str = "openai"
-    model: str = "gpt-5-mini"
+    model: str = "gpt-4o-mini"
     max_query_plan_tokens: int = 600
     max_summary_tokens: int = 900
 
