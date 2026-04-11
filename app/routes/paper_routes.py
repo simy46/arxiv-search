@@ -4,6 +4,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+from app.core.errors import ApiServiceError
 from app.core.logger import log_partial_result
 from app.manager.paper_manager import PaperManager
 
@@ -82,6 +83,18 @@ def create_paper_blueprint(
                 }
             ), 400
 
+        if style not in {"brief", "detailed"}:
+            logger.warning("route.paper_summarize invalid_request invalid_style=%s", style)
+            return jsonify(
+                {
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "style must be 'brief' or 'detailed'",
+                        "details": {},
+                    }
+                }
+            ), 400
+
         try:
             response = paper_manager.summarize_paper(
                 history_id=history_id,
@@ -94,17 +107,33 @@ def create_paper_blueprint(
                 paper_id,
             )
             return jsonify(response), 200
-        except ValueError as exc:
+        except ApiServiceError as exc:
             logger.exception(
-                "route.paper_summarize failed history_id=%s paper_id=%s",
+                "route.paper_summarize service_error code=%s history_id=%s paper_id=%s",
+                exc.code,
                 history_id,
                 paper_id,
             )
             return jsonify(
                 {
                     "error": {
-                        "code": "INTERNAL_ERROR",
-                        "message": str(exc),
+                        "code": exc.code,
+                        "message": exc.message,
+                        "details": exc.details,
+                    }
+                }
+            ), exc.status_code
+        except Exception as exc:
+            logger.exception(
+                "route.paper_summarize unexpected_error history_id=%s paper_id=%s",
+                history_id,
+                paper_id,
+            )
+            return jsonify(
+                {
+                    "error": {
+                        "code": "SUMMARY_FAILED",
+                        "message": str(exc) or "Summary failed",
                         "details": {},
                     }
                 }

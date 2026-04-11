@@ -3,18 +3,29 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from contextlib import AsyncExitStack
 from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from app.core.errors import RateLimitedError, SearchFailedError
 from app.core.logger import log_partial_result
 from app.core.types import Paper
 from app.params import MCP_PARAMS
 
 
 class MCPArxivClient:
+    _RATE_LIMIT_PATTERNS = (
+        r"\b429\b",
+        r"\b503\b",
+        r"rate[\s-]?limit",
+        r"too many requests",
+        r"temporarily unavailable",
+        r"retry later",
+    )
+
     def __init__(
         self,
         logger: logging.Logger,
@@ -79,6 +90,9 @@ class MCPArxivClient:
         )
 
         if isinstance(result, dict):
+            if "error" in result:
+                message = str(result.get("error", "")).strip() or "Paper download failed"
+                self._raise_with_rate_limit_detection(message)
             return result
 
         return {
@@ -97,6 +111,9 @@ class MCPArxivClient:
         )
 
         if isinstance(result, dict):
+            if "error" in result:
+                message = str(result.get("error", "")).strip() or "Paper read failed"
+                self._raise_with_rate_limit_detection(message)
             content = (
                 result.get("content_markdown")
                 or result.get("content")
@@ -135,7 +152,9 @@ class MCPArxivClient:
                     tool_name,
                     error_text,
                 )
-                return {"error": error_text}
+                self._raise_with_rate_limit_detection(
+                    error_text or f"MCP tool {tool_name} failed"
+                )
 
             structured_content = getattr(result, "structuredContent", None)
             if structured_content is not None:
@@ -161,6 +180,7 @@ class MCPArxivClient:
                 )
                 return parsed
             except json.JSONDecodeError:
+                self._raise_if_rate_limited(text)
                 self._logger.info(
                     "mcp_client.call_tool success tool=%s raw_text",
                     tool_name,
@@ -189,11 +209,9 @@ class MCPArxivClient:
 
         elif isinstance(payload, dict):
             if "error" in payload:
-                self._logger.error(
-                    "mcp_client.search_papers tool_error=%r",
-                    payload["error"],
-                )
-                return []
+                message = str(payload["error"]).strip()
+                self._logger.error("mcp_client.search_papers tool_error=%r", message)
+                self._raise_with_rate_limit_detection(message or "arXiv search failed")
 
             for key in ("results", "papers", "items"):
                 value = payload.get(key)
@@ -243,3 +261,20 @@ class MCPArxivClient:
             )
 
         return papers
+
+    def _raise_with_rate_limit_detection(self, message: str) -> None:
+        if self._is_rate_limited_message(message):
+            raise RateLimitedError()
+
+        raise SearchFailedError(message)
+
+    def _raise_if_rate_limited(self, message: str) -> None:
+        if self._is_rate_limited_message(message):
+            raise RateLimitedError()
+
+    def _is_rate_limited_message(self, message: str) -> bool:
+        lower_message = message.lower()
+        return any(
+            re.search(pattern, lower_message)
+            for pattern in self._RATE_LIMIT_PATTERNS
+        )

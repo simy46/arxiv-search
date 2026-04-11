@@ -4,6 +4,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+from app.core.errors import ApiServiceError
 from app.core.logger import log_partial_result
 from app.manager.arxiv_search_manager import ArxivSearchManager
 
@@ -44,11 +45,7 @@ def create_search_blueprint(
 
             date_from = str(date_from_raw).strip() if date_from_raw else None
 
-            result = search_manager.search(
-                query=query,
-                categories=[],
-                date_from=date_from,
-            )
+            result = search_manager.search(query=query, categories=[], date_from=date_from)
 
             logger.info(
                 "route.search success history_id=%s returned_count=%s cache_hit=%s",
@@ -58,17 +55,17 @@ def create_search_blueprint(
             )
             return jsonify(result.to_dict()), 200
 
-        except RuntimeError as exc:
-            logger.exception("route.search runtime_error")
+        except ApiServiceError as exc:
+            logger.exception("route.search service_error code=%s", exc.code)
             return jsonify(
                 {
                     "error": {
-                        "code": "QUERY_PLAN_FAILED",
-                        "message": str(exc),
-                        "details": {},
+                        "code": exc.code,
+                        "message": exc.message,
+                        "details": exc.details,
                     }
                 }
-            ), 500
+            ), exc.status_code
 
         except Exception as exc:
             logger.exception("route.search unexpected_error")
@@ -76,7 +73,7 @@ def create_search_blueprint(
                 {
                     "error": {
                         "code": "SEARCH_FAILED",
-                        "message": str(exc),
+                        "message": str(exc) or "Search failed",
                         "details": {},
                     }
                 }
