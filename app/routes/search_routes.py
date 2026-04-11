@@ -18,45 +18,68 @@ def create_search_blueprint(
     @blueprint.post("/search")
     def search() -> tuple[object, int]:
         logger.info("route.search POST /api/v1/search")
-        payload = request.get_json(silent=True) or {}
-        log_partial_result(
-            logger,
-            log_partial_results,
-            "route.search payload=%s",
-            payload,
-        )
 
-        query = str(payload.get("query", "")).strip()
-        categories_raw = payload.get("categories", [])
-        date_from_raw = payload.get("date_from")
+        try:
+            payload = request.get_json(silent=True) or {}
+            log_partial_result(
+                logger,
+                log_partial_results,
+                "route.search payload=%s",
+                payload,
+            )
 
-        if not query:
-            logger.warning("route.search invalid_request missing_query")
+            query = str(payload.get("query", "")).strip()
+            date_from_raw = payload.get("date_from")
+
+            if not query:
+                return jsonify(
+                    {
+                        "error": {
+                            "code": "INVALID_REQUEST",
+                            "message": "query is required",
+                            "details": {},
+                        }
+                    }
+                ), 400
+
+            date_from = str(date_from_raw).strip() if date_from_raw else None
+
+            result = search_manager.search(
+                query=query,
+                categories=[],
+                date_from=date_from,
+            )
+
+            logger.info(
+                "route.search success history_id=%s returned_count=%s cache_hit=%s",
+                result.history_id,
+                result.returned_count,
+                result.cache_hit,
+            )
+            return jsonify(result.to_dict()), 200
+
+        except RuntimeError as exc:
+            logger.exception("route.search runtime_error")
             return jsonify(
                 {
                     "error": {
-                        "code": "INVALID_REQUEST",
-                        "message": "query is required",
+                        "code": "QUERY_PLAN_FAILED",
+                        "message": str(exc),
                         "details": {},
                     }
                 }
-            ), 400
+            ), 500
 
-        categories = categories_raw if isinstance(categories_raw, list) else []
-        date_from = str(date_from_raw).strip() if date_from_raw else None
-
-        result = search_manager.search(
-            query=query,
-            categories=categories,
-            date_from=date_from,
-        )
-        logger.info(
-            "route.search success history_id=%s returned_count=%s cache_hit=%s",
-            result.history_id,
-            result.returned_count,
-            result.cache_hit,
-        )
-
-        return jsonify(result.to_dict()), 200
+        except Exception as exc:
+            logger.exception("route.search unexpected_error")
+            return jsonify(
+                {
+                    "error": {
+                        "code": "SEARCH_FAILED",
+                        "message": str(exc),
+                        "details": {},
+                    }
+                }
+            ), 500
 
     return blueprint
