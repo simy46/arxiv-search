@@ -24,3 +24,20 @@ def build_logger(name: str, debug: bool) -> logging.Logger:
     logger.propagate = False
 
     return logger
+
+
+def should_log_partial_results(
+    logger: logging.Logger,
+    force_enabled: bool = False,
+) -> bool:
+    return force_enabled or logger.isEnabledFor(logging.DEBUG)
+
+
+def log_partial_result(
+    logger: logging.Logger,
+    force_enabled: bool,
+    message: str,
+    *args: object,
+) -> None:
+    if should_log_partial_results(logger, force_enabled):
+        logger.debug("[partial] " + message, *args)
