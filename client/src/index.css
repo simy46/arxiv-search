@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 97%;
+    --foreground: 220 15% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 18%;
+
+    --primary: 215 20% 35%;
+    --primary-foreground: 0 0% 97%;
+
+    --secondary: 220 10% 93%;
+    --secondary-foreground: 220 15% 22%;
+
+    --muted: 220 10% 93%;
+    --muted-foreground: 220 8% 50%;
+
+    --accent: 220 10% 90%;
+    --accent-foreground: 220 15% 18%;
+
+    --destructive: 0 55% 48%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 10% 86%;
+    --input: 220 10% 86%;
+    --ring: 215 20% 35%;
+
+    --radius: 0.25rem;
+
+    --surface: 0 0% 100%;
+    --surface-raised: 220 10% 96%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 10% 25%;
+    --sidebar-primary: 215 20% 35%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 10% 92%;
+    --sidebar-accent-foreground: 220 15% 18%;
+    --sidebar-border: 220 10% 86%;
+    --sidebar-ring: 215 20% 35%;
+  }
+
+  .dark {
+    --background: 220 16% 10%;
+    --foreground: 220 10% 85%;
+
+    --card: 220 14% 13%;
+    --card-foreground: 220 10% 85%;
+
+    --popover: 220 14% 13%;
+    --popover-foreground: 220 10% 85%;
+
+    --primary: 215 15% 55%;
+    --primary-foreground: 220 16% 10%;
+
+    --secondary: 220 12% 17%;
+    --secondary-foreground: 220 10% 78%;
+
+    --muted: 220 12% 17%;
+    --muted-foreground: 220 8% 52%;
+
+    --accent: 220 12% 19%;
+    --accent-foreground: 220 10% 82%;
+
+    --destructive: 0 50% 45%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 220 12% 20%;
+    --input: 220 12% 20%;
+    --ring: 215 15% 55%;
+
+    --surface: 220 14% 13%;
+    --surface-raised: 220 12% 15%;
+
+    --sidebar-background: 220 16% 11%;
+    --sidebar-foreground: 220 10% 78%;
+    --sidebar-primary: 215 15% 55%;
+    --sidebar-primary-foreground: 220 16% 10%;
+    --sidebar-accent: 220 12% 17%;
+    --sidebar-accent-foreground: 220 10% 82%;
+    --sidebar-border: 220 12% 20%;
+    --sidebar-ring: 215 15% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
