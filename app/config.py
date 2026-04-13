@@ -16,7 +16,7 @@ class Config:
     debug: bool
     log_partial_results: bool
     history_file_path: Path
-    max_search_results: int
+    max_search_results: int | None
     openai_api_key: str
     openai_model: str
 
@@ -30,6 +30,14 @@ class Config:
         if not history_file_path.exists():
             history_file_path.write_text("[]", encoding="utf-8")
 
+        raw_max_search_results = os.getenv("APP_MAX_SEARCH_RESULTS", "").strip()
+        max_search_results: int | None = None
+        if raw_max_search_results:
+            parsed_max_search_results = int(raw_max_search_results)
+            max_search_results = (
+                parsed_max_search_results if parsed_max_search_results > 0 else None
+            )
+
         return cls(
             host=os.getenv("APP_HOST", "0.0.0.0"), # "127.0.0.1" if only local, i like to use it w my phone
             port=int(os.getenv("APP_PORT", "5000")),
@@ -38,7 +46,7 @@ class Config:
                 os.getenv("APP_LOG_PARTIAL_RESULTS", "false").strip().lower() == "true"
             ),
             history_file_path=history_file_path,
-            max_search_results=20,
+            max_search_results=max_search_results,
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
         )

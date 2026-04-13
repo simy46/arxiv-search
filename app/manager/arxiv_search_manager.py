@@ -20,7 +20,7 @@ class ArxivSearchManager:
         mcp_arxiv_client: MCPArxivClient,
         logger: logging.Logger,
         log_partial_results: bool = False,
-        max_results: int = 20,
+        max_results: int | None = None,
     ) -> None:
         self._history_manager = history_manager
         self._llm_search_orchestrator = llm_search_orchestrator
@@ -54,6 +54,14 @@ class ArxivSearchManager:
                 categories=categories,
                 date_from=date_from,
             )
+            if existing is not None and self._max_results is None:
+                # Unlimited mode should not reuse legacy-capped history rows.
+                self._logger.info(
+                    "search_manager.search skip_cache_unlimited source_history_id=%s existing_count=%s",
+                    existing.history_id,
+                    len(existing.results),
+                )
+                existing = None
             if existing is not None:
                 self._logger.info(
                     "search_manager.search cache_reused source_history_id=%s result_count=%s",
@@ -92,7 +100,7 @@ class ArxivSearchManager:
             collected_by_id: dict[str, Paper] = {}
             executed_queries = []
 
-            for index, generated_query in enumerate(query_plan.generated_queries):
+            for generated_query in query_plan.generated_queries:
                 self._logger.info(
                     "search_manager.search execute_generated_query query=%r",
                     generated_query.query,
@@ -115,14 +123,6 @@ class ArxivSearchManager:
 
                 for paper in papers:
                     collected_by_id[paper.paper_id] = paper
-
-                # If the first query already gives enough candidates, skip extra upstream calls.
-                if index == 0 and len(collected_by_id) >= 10:
-                    self._logger.info(
-                        "search_manager.search early_stop first_query_candidates=%s",
-                        len(collected_by_id),
-                    )
-                    break
 
             ranked_results = self._reranker.rank(
                 user_query=query,

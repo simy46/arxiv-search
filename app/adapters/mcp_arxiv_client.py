@@ -49,7 +49,7 @@ class MCPArxivClient:
         query: str,
         categories: list[str] | None = None,
         date_from: str | None = None,
-        max_results: int = 20,
+        max_results: int | None = None,
     ) -> list[Paper]:
         self._logger.info(
             "mcp_client.search_papers query=%r max_results=%s",
@@ -59,9 +59,10 @@ class MCPArxivClient:
 
         arguments: dict[str, Any] = {
             "query": query,
-            "max_results": max_results,
             "sort_by": "relevance",
         }
+        if max_results is not None:
+            arguments["max_results"] = max_results
 
         if categories:
             arguments["categories"] = categories
@@ -79,7 +80,7 @@ class MCPArxivClient:
             len(papers),
         )
         return papers
-    
+
     def _clean_external_content_prefix(self, text: str) -> str:
         return re.sub(r"^\s*\[EXTERNAL CONTENT\]\s*", "", text).strip()
 

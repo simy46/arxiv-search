@@ -47,7 +47,12 @@ class Reranker:
         self._logger = logger
         self._log_partial_results = log_partial_results
 
-    def rank(self, user_query: str, papers: list[Paper], limit: int = 20) -> list[Paper]:
+    def rank(
+        self,
+        user_query: str,
+        papers: list[Paper],
+        limit: int | None = None,
+    ) -> list[Paper]:
         self._logger.info(
             "reranker.rank user_query=%r input_count=%s limit=%s",
             user_query,
@@ -107,7 +112,7 @@ class Reranker:
             key=lambda item: (item.score, item.published),
             reverse=True,
         )
-        top_ranked = ranked[:limit]
+        top_ranked = ranked if limit is None else ranked[:limit]
 
         log_partial_result(
             self._logger,
