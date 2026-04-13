@@ -7,7 +7,6 @@ import ResultsList from "@/components/ResultsList";
 import HistoryPanel from "@/components/HistoryPanel";
 import {
   search,
-  downloadPaper,
   summarizePaper,
   fetchHistoryDetail,
   getApiErrorMessage,
@@ -30,7 +29,6 @@ export default function Index() {
   const [activeHistoryError, setActiveHistoryError] = useState<string | null>(null);
 
   const [summarizingIds, setSummarizingIds] = useState<Set<string>>(new Set());
-  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
 
   // key to remount SearchBar on history restore
   const [searchKey, setSearchKey] = useState(0);
@@ -123,20 +121,6 @@ export default function Index() {
     }
   }, [refreshHistory, refreshHistoryAfterDelay, setActiveHistoryId, showApiErrorToast]);
 
-  const handleDownload = useCallback(async (paperId: string) => {
-    setDownloadingIds((s) => new Set(s).add(paperId));
-    try {
-      const response = await downloadPaper(paperId);
-      setResults((prev) => prev.map((p) => (
-        p.paper_id === paperId ? { ...p, downloaded: response.downloaded } : p
-      )));
-    } catch (error: unknown) {
-      showApiErrorToast(error);
-    } finally {
-      setDownloadingIds((s) => { const n = new Set(s); n.delete(paperId); return n; });
-    }
-  }, [showApiErrorToast]);
-
   const handleSummarize = useCallback(async (paperId: string) => {
     const existingPaper = results.find((paper) => paper.paper_id === paperId);
     const contextHistoryId = historyId;
@@ -221,10 +205,8 @@ export default function Index() {
       <ResultsList
         results={results}
         totalCandidates={totalCandidates}
-        onDownload={handleDownload}
         onSummarize={handleSummarize}
         summarizingIds={activeSummarizingIds}
-        downloadingIds={downloadingIds}
       />
       {!results.length && !loading && (
         <div className="px-4 py-8 text-center text-xs text-muted-foreground">

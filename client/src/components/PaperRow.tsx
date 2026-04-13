@@ -1,4 +1,4 @@
-import { Download, FileText, Check } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import type { Paper } from "@/lib/api";
 
 const formatPublishedDate = (value: string): string => {
@@ -17,16 +17,15 @@ const formatPublishedDate = (value: string): string => {
 
 interface Props {
   paper: Paper;
-  onDownload: (paperId: string) => void;
   onSummarize: (paperId: string) => void;
   summary: { summary: string; highlights: string[] } | null;
   summarizing: boolean;
-  downloading: boolean;
 }
 
-export default function PaperRow({ paper, onDownload, onSummarize, summary, summarizing, downloading }: Props) {
+export default function PaperRow({ paper, onSummarize, summary, summarizing }: Props) {
   const hasSummary = !!summary;
   const publishedDate = formatPublishedDate(paper.published);
+  const downloadUrl = paper.pdf_url || paper.abs_url;
 
   return (
     <div className="border-b border-border/60 px-4 py-3 transition-colors hover:bg-surface-raised/50">
@@ -63,14 +62,20 @@ export default function PaperRow({ paper, onDownload, onSummarize, summary, summ
           </p>
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 pt-0.5">
-          <button
-            onClick={() => onDownload(paper.paper_id)}
-            disabled={paper.downloaded || downloading}
-            className="flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-35"
+          <a
+            href={downloadUrl || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!downloadUrl}
+            className={`flex items-center gap-1 rounded border px-2 py-1 text-[11px] transition-colors ${
+              downloadUrl
+                ? "text-muted-foreground hover:bg-accent hover:text-foreground"
+                : "pointer-events-none text-muted-foreground/40"
+            }`}
           >
-            {paper.downloaded ? <Check size={11} /> : <Download size={11} />}
-            {paper.downloaded ? "Saved" : downloading ? "…" : "Download"}
-          </button>
+            <Download size={11} />
+            Download
+          </a>
           {!hasSummary && (
             <button
               onClick={() => onSummarize(paper.paper_id)}
